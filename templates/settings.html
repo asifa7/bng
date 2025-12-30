@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manage Settings</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>Settings</h1>
+    <a class="manage-link" href="/">Back</a>
+  </div>
+
+  <div class="card">
+    <h3>BNG Devices</h3>
+    <table id="bngTable">
+      <thead>
+        <tr><th>Name</th><th>IP</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="addBNG()">Add BNG</button>
+  </div>
+
+  <div class="card">
+    <h3>Credentials</h3>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+  </div>
+
+  <div class="card">
+    <h3>Commands (one per line)</h3>
+    <textarea id="commands" rows="6"></textarea>
+  </div>
+
+  <button class="validate-btn" onclick="save()">Save Settings</button>
+
+</div>
+
+<script>
+let data;
+
+fetch('/api/settings')
+  .then(r => r.json())
+  .then(d => {
+    data = d;
+    render();
+  });
+
+function render() {
+  const body = document.querySelector('#bngTable tbody');
+  body.innerHTML = '';
+  data.bngs.forEach((b, i) => {
+    body.innerHTML += `
+      <tr>
+        <td><input value="${b.name}" onchange="data.bngs[${i}].name=this.value"></td>
+        <td><input value="${b.ip}" onchange="data.bngs[${i}].ip=this.value"></td>
+        <td><button onclick="removeBNG(${i})">X</button></td>
+      </tr>`;
+  });
+
+  username.value = data.credentials.username;
+  password.value = data.credentials.password;
+  commands.value = data.commands.join('\n');
+}
+
+function addBNG() {
+  data.bngs.push({ name: '', ip: '' });
+  render();
+}
+
+function removeBNG(i) {
+  data.bngs.splice(i, 1);
+  render();
+}
+
+function save() {
+  data.credentials.username = username.value;
+  data.credentials.password = password.value;
+  data.commands = commands.value.split('\n').filter(Boolean);
+
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(() => alert('Saved'));
+}
+</script>
+
+</body>
+</html>

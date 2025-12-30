@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Audit Validation Tool</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Audit Validation Tool</h1>
+    <a class="manage-link" href="/settings">Manage Settings</a>
+  </div>
+
+  <!-- BNG Selection -->
+  <div class="upload-card">
+    <label>Select BNG</label>
+    <select id="bngSelect" multiple size="4">
+      <!-- populated dynamically -->
+    </select>
+    <div class="file-name">Click to select one or more BNGs</div>
+  </div>
+
+  <!-- Validate Button -->
+  <button id="validateBtn" class="validate-btn" disabled>
+    Validate
+  </button>
+
+  <!-- Results -->
+  <div id="results" class="card" style="display:none;">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>BNG</th>
+          <th>Command</th>
+          <th>Status</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+/* ------------------------------
+   Load BNGs
+--------------------------------*/
+fetch('/api/bngs')
+  .then(res => res.json())
+  .then(bngs => {
+    const select = document.getElementById('bngSelect');
+    bngs.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.name;
+      opt.textContent = `${b.name} (${b.ip})`;
+      select.appendChild(opt);
+    });
+  });
+
+/* ------------------------------
+   Make multi-select work on single click
+--------------------------------*/
+const bngSelect = document.getElementById('bngSelect');
+
+bngSelect.addEventListener('mousedown', function (e) {
+  e.preventDefault();
+  const option = e.target;
+  option.selected = !option.selected;
+  bngSelect.dispatchEvent(new Event('change'));
+});
+
+/* ------------------------------
+   Helper: get selected BNGs
+--------------------------------*/
+function getSelectedBNGs() {
+  return Array.from(bngSelect.options)
+    .filter(o => o.selected)
+    .map(o => o.value);
+}
+
+/* ------------------------------
+   Enable / disable Validate button
+--------------------------------*/
+bngSelect.addEventListener('change', () => {
+  const selected = getSelectedBNGs();
+  document.getElementById('validateBtn').disabled = selected.length === 0;
+});
+
+/* ------------------------------
+   Validate click
+--------------------------------*/
+document.getElementById('validateBtn').addEventListener('click', async () => {
+  const selectedBNGs = getSelectedBNGs();
+
+  if (selectedBNGs.length === 0) {
+    alert('Select at least one BNG');
+    return;
+  }
+
+  const btn = document.getElementById('validateBtn');
+  btn.innerText = 'Running...';
+  btn.disabled = true;
+
+  const response = await fetch('/api/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bngs: selectedBNGs })
+  });
+
+  const results = await response.json();
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+
+  results.forEach((r, i) => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${r.bng}</td>
+        <td>${r.command}</td>
+        <td class="${r.status === 'PASS' ? 'pass' : 'fail'}">${r.status}</td>
+        <td><pre>${r.output}</pre></td>
+      </tr>
+    `;
+  });
+
+  document.getElementById('results').style.display = 'block';
+  btn.innerText = 'Validate';
+  btn.disabled = false;
+});
+</script>
+
+</body>
+</html>
